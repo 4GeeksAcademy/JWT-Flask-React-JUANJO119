@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_migrate import Migrate
 from flask_swagger import swagger
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from flask_bcrypt import Bcrypt
 from api.utils import APIException, generate_sitemap
 from api.models import db, User
 from api.routes import api
@@ -22,6 +23,8 @@ app.url_map.strict_slashes = False
 
 app.config["JW_KEY"] = os.getenv('JW_KEY')
 jwt = JWTManager(app)
+
+bcrypt = Bcrypt(app)
 
 # database condiguration
 db_url = os.getenv("DATABASE_URL")
@@ -80,15 +83,17 @@ def login():
         return jsonify({'msg': 'Campo email obligatorio'}), 400
     if 'password' not in body:
         return jsonify({'msg': 'Campo password obligatorio'}), 400
-
-    user_registered = User.query.filter_by(
+    user = User.query.filter_by(
         email=body['email'], password=body['password']).first()
-    if user_registered is None:
+    if user is None:
         return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
-    
-    access_token = create_access_token(identity=user_registered.email)
-
+    is_correct = bcrypt.check_password_hash(user.password, body['password'])
+    if is_correct == False:
+        return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
+    access_token = create_access_token(identity=user.email)
     return jsonify({'msg': 'Todo salió bien', 'token': access_token}), 200
+
+
 
 @app.route("/api/private", methods=["GET"])
 @jwt_required()
@@ -100,20 +105,15 @@ def private():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    body = request.get_json(silent=True)
-    if body is None:
-        return jsonify({'msg':'Envia información al body'}), 400
-    if 'email' not in body:
-        return jsonify({'msg': 'Campo email obligatorio'}), 400
-    if 'password' not in body:
-        return jsonify({'msg': 'Campo password obligatorio'}), 400
+    body = request.get_json()
     user = User()
     user.email = body['email']
-    user.password = body['password']
+    hash_password = bcrypt.generate_password_hash(body['password']).decode('utf-8')
+    user.password = hash_password
     user.is_active = True
     db.session.add(user)
     db.session.commit()
-    return jsonify({'msg': 'Usuario registrado con éxito'}), 200
+    return jsonify({'msg': 'Usuario creado con éxito'}), 200
 
 
 
