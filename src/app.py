@@ -90,6 +90,13 @@ def login():
 
     return jsonify({'msg': 'Todo salió bien', 'token': access_token}), 200
 
+@app.route("/api/private", methods=["GET"])
+@jwt_required()
+def private():
+    current_user = get_jwt_identity()
+    print(current_user)
+    return jsonify({'msg': 'Gracias por registrarte'}), 200
+
 
 @app.route('/api/register', methods=['POST'])
 def register():
