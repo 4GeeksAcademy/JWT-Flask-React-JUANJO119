@@ -85,13 +85,15 @@ def login():
         return jsonify({'msg': 'Campo password obligatorio'}), 400
     user = User.query.filter_by(
         email=body['email'], password=body['password']).first()
+    print(user)
     if user is None:
         return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
     is_correct = bcrypt.check_password_hash(user.password, body['password'])
     if is_correct == False:
         return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
     access_token = create_access_token(identity=user.email)
-    return jsonify({'msg': 'Todo salió bien', 'token': access_token}), 200
+    return jsonify({'msg': 'Todo salió bien', 
+                    'token': access_token}), 200
 
 
 
