@@ -5,6 +5,7 @@ import os
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_migrate import Migrate
 from flask_swagger import swagger
+from flask_cors import CORS
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from flask_bcrypt import Bcrypt
 from api.utils import APIException, generate_sitemap
@@ -21,10 +22,12 @@ static_file_dir = os.path.join(os.path.dirname(
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 
-app.config["JW_KEY"] = os.getenv('JW_KEY')
+app.config["JWT_SECRET_KEY"] = os.getenv('JWT_SECRET_KEY', 'default_secret')
 jwt = JWTManager(app)
 
 bcrypt = Bcrypt(app)
+
+CORS(app)
 
 # database condiguration
 db_url = os.getenv("DATABASE_URL")
@@ -77,23 +80,17 @@ def serve_any_other_file(path):
 @app.route('/api/login', methods=['POST'])
 def login():
     body = request.get_json(silent=True)
-    if body is None:
+    if not body:
         return jsonify({'msg': 'Envia información al body'}), 400
-    if 'email' not in body:
-        return jsonify({'msg': 'Campo email obligatorio'}), 400
-    if 'password' not in body:
-        return jsonify({'msg': 'Campo password obligatorio'}), 400
-    user = User.query.filter_by(
-        email=body['email'], password=body['password']).first()
-    print(user)
-    if user is None:
+    if 'email' not in body or 'password' not in body:
+        return jsonify({'msg': 'Campos email y password son obligatorios'}), 400
+
+    user = User.query.filter_by(email=body['email']).first()
+    if not user or not bcrypt.check_password_hash(user.password, body['password']):
         return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
-    is_correct = bcrypt.check_password_hash(user.password, body['password'])
-    if is_correct == False:
-        return jsonify({'msg': 'Usuario o Contraseña incorrecta'}), 400
+
     access_token = create_access_token(identity=user.email)
-    return jsonify({'msg': 'Todo salió bien', 
-                    'token': access_token}), 200
+    return jsonify({'msg': 'Todo salió bien', 'token': access_token}), 200
 
 
 
